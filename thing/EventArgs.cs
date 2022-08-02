@@ -51,39 +51,56 @@ namespace thing
 
     public class PropertyChangeArgs : EventArgs
     {
-        public PropertyChangeArgs(string old_value, string new_value)
+        public PropertyChangeArgs(string prop_name, string old_value, string new_value)
         {
-            OldValue = old_value;
-            NewValue = new_value;
+            this.PropertyName = prop_name;
+            this.OldValue = old_value;
+            this.NewValue = new_value;
         }
-        public PropertyChangeArgs(int old_value, int new_value)
+        public PropertyChangeArgs(string prop_name, int old_value, int new_value)
         {
+            this.PropertyName = prop_name;
             this.OldValue = old_value.ToString();
             this.NewValue = new_value.ToString();
         }
-        public PropertyChangeArgs(DateTime old_value, DateTime new_value)
+        public PropertyChangeArgs(string prop_name, DateTime old_value, DateTime new_value)
         {
+            this.PropertyName = prop_name;
             this.OldValue = old_value.ToShortDateString() + " " + old_value.ToShortTimeString();
             this.NewValue = new_value.ToShortDateString() + " " + new_value.ToShortTimeString();
         }
-        public PropertyChangeArgs(decimal old_value, decimal new_value)
+        public PropertyChangeArgs(string prop_name, decimal old_value, decimal new_value)
         {
+            this.PropertyName = prop_name;
             this.OldValue = old_value.ToString();
             this.NewValue = new_value.ToString();
         }
-        public PropertyChangeArgs(bool old_value, bool new_value)
+        public PropertyChangeArgs(string prop_name, bool old_value, bool new_value)
         {
+            this.PropertyName = prop_name;
             this.OldValue = old_value.ToString();
             this.NewValue = new_value.ToString();
         }
-        public PropertyChangeArgs(Guid old_value, Guid new_value)
+        public PropertyChangeArgs(string prop_name, Guid old_value, Guid new_value)
         {
+            this.PropertyName = prop_name;
             this.OldValue = old_value.ToString();
             this.NewValue = new_value.ToString();
         }
 
+        public string PropertyName { get; }
         public string OldValue { get; }
         public string NewValue { get; }
+    }
+
+    public class SqlEventArgs : EventArgs
+    {
+        public SqlEventArgs(string sql)
+        {
+            this.Sql = sql;
+        }
+
+        public string Sql { get; }
     }
 
 }

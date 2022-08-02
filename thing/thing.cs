@@ -11,53 +11,67 @@ namespace thing
     public class Thing : IThing
     {
 
-        protected Thing(Guid id, bool id_is_type)
+        internal Thing(Guid id, bool id_is_type)
         {
             if (id_is_type)
             {
-                this.TypeId = id;
                 this.Id = Guid.NewGuid();
-                this.IsChanged = true;
+                this.TypeId = id;
                 this.IsNew = true;
+                this.StatusId = StatusThing.ID_ACTIVE;
+                _Properties = new PropertyValueList(this.Id);
             }
             else
             {
                 this.Id = id;
-                this.RefreshData();
+                this.IsNew = false;
+                _Properties = new PropertyValueList(this.Id);
+                this.Refresh();
             }
+
+            // subscribe
+            _Properties.OnChanged += this.OnChanged;
         }
 
         public Guid Id { get; } = Guid.Empty;
-        public virtual Guid TypeId { get; } = Guid.Empty;
-        public bool IsChanged
-        {
-            get
-            {
-                if (this.IsNew) _IsChanged = true;
-                return _IsChanged;
-            }
-            set
-            {
-                if (this.IsNew)
-                {
-                    _IsChanged = true;
-                    return;
-                }
-                
-                _IsChanged = value;
-            }
-        }
-        private bool _IsChanged = false;
+        public Guid StatusId { get; set; } = Guid.Empty;
+        private Guid _OriginalStatus = Guid.Empty;
+        public Guid TypeId { get; private set; } = Guid.Empty;
+        private Guid _OriginalType = Guid.Empty;
         public bool IsNew { get; private set; } = false;
-
-        protected bool Error(Exception e) { return this.Error(e.Message, "Exception Error..."); }
-        protected bool Error(string error) { return this.Error(error, "Error..."); }
-        protected bool Error(string error, string title)
+        
+        public string Name
         {
-            // set status
-            this.Status(error);
+            get { return _Properties.GetString(PropertyThing.ID_NAME); }
+            set { _Properties.SetValue(PropertyThing.ID_NAME, value); }
+        }
+        public string Code
+        {
+            get { return _Properties.GetString(PropertyThing.ID_CODE); }
+            set { _Properties.SetValue(PropertyThing.ID_CODE, value); }
+        }
+        public string Description
+        {
+            get { return _Properties.GetString(PropertyThing.ID_DESCRIPTION); }
+            set { _Properties.SetValue(PropertyThing.ID_DESCRIPTION, value); }
+        }
 
-            // trigger error event
+        public IPropertyValueList Properties { get { return _Properties; } }
+        private PropertyValueList _Properties;
+
+        public void Dispose()
+        {
+            // properties
+            _Properties.OnChanged -= this.OnChanged;
+            _Properties.Dispose();
+            _Properties = null;
+
+        }
+
+        protected bool Error(Exception e) { return this.Error(e.Message); }
+        protected bool Error(string error)
+        {
+            // event
             var args = new ErrorEventArgs(error);
             var handler = this.OnError;
             handler?.Invoke(this, args);
@@ -65,74 +79,97 @@ namespace thing
             // always return false
             return false;
         }
-        protected void Status(string status, bool continue_processing = true)
-        {
-            // trigger message event
-            var args = new StatusEventArgs(status, continue_processing);
-            var handler = this.OnStatus;
-            handler?.Invoke(this, args);
-        }
-        protected bool ValidationFail(string message)
-        {
-            // send as error message
-            return this.Error(message, "Validation Failed...");
-        }
 
-        protected bool Changed(string old_value, string new_value)
-        {
-            // check if actually changed
-            if (old_value == new_value) return false;
-            if (!this.IsChanged) this.IsChanged = true;
-
-            // event
-            var args = new PropertyChangeArgs(old_value, new_value);
-            var handler = this.OnChanged;
-            handler?.Invoke(this, args);
-
-            // default
-            return true;
-        }
-        protected bool Changed(int old_value, int new_value) { return this.Changed(old_value.ToString(), new_value.ToString()); }
-        protected bool Changed(bool old_value, bool new_value) { return this.Changed(old_value.ToString(), new_value.ToString()); }
-        protected bool Changed(decimal old_value, decimal new_value) { return this.Changed(old_value.ToString(), new_value.ToString()); }
-        protected bool Changed(Guid old_value, Guid new_value) { return this.Changed(old_value.ToString(), new_value.ToString()); }
-        protected bool Changed(DateTime old_value, DateTime new_value)
-        {
-            var old_date = old_value.ToShortDateString() + " " + old_value.ToShortTimeString();
-            var new_date = new_value.ToShortDateString() + " " + new_value.ToShortTimeString();
-            return this.Changed(old_date, new_date);
-        }
-
-        public bool RefreshData()
-        {
-            // default
-            return true;
-        }
-
-        protected Queue<string> GetInserts()
+        protected virtual Queue<string> GetInserts()
         {
             var queue = new Queue<string>();
-
+            var sql = new StringBuilder();
+            sql.Append("INSERT [thing].[Master] ( [Id], [TypeId], [StatusId] ) SELECT '");
+            sql.Append(this.Id);
+            sql.Append("', '");
+            sql.Append(this.TypeId);
+            sql.Append("', '");
+            sql.Append(this.StatusId);
+            sql.Append("'");
+            queue.Enqueue(sql.ToString());
             return queue;
         }
-        protected Queue<string> GetUpdates()
+        protected virtual Queue<string> GetUpdates()
         {
             var queue = new Queue<string>();
-
-            return queue;
-        }
-        
-
-        public bool SaveData() { return this.SaveData(true); }
-        public bool SaveData(bool validate)
-        {
-            // validate ?
-            if (validate)
+            if(this.StatusId != _OriginalStatus || this.TypeId != _OriginalType)
             {
-                if (!this.ValidateData()) return false;
+                var sql = new StringBuilder();
+                sql.Append("UPDATE [thing].[Master] SET [TypeId] = '");
+                sql.Append(this.TypeId);
+                sql.Append("', [StatusId] = '");
+                sql.Append(this.StatusId);
+                sql.Append("' ");
+                sql.Append(this.GetWhereClause());
+                queue.Enqueue(sql.ToString());
+            }
+            return queue;
+        }
+        protected string GetWhereClause()
+        {
+            // sql
+            var sql = new StringBuilder();
+            sql.Append(" WHERE [Id] = '");
+            sql.Append(this.Id);
+            sql.Append("'");
+
+            // return
+            return sql.ToString();
+        }
+
+        public bool Refresh()
+        {
+            // properties
+            if (!_Properties.Refresh()) return false;
+
+            // data from thing.master
+            var sql = new StringBuilder();
+            sql.Append("SELECT [TypeId], [StatusId] FROM [thing].[Master] ");
+            sql.Append(this.GetWhereClause());
+
+            // start reader
+            if(!Thingy.DB.StartReader(sql.ToString())) return false;
+
+            // read first line
+            if (Thingy.DB.Reader.Read())
+            {
+                this.TypeId = Thingy.DB.Reader.GetGuid(0);
+                this.StatusId = Thingy.DB.Reader.GetGuid(1);
+            }
+            else
+            {
+                // error
+                Thingy.DB.Disconnect();
+                return false;
             }
 
-            // save
+            // set original values
+            _OriginalStatus = this.StatusId;
+            _OriginalType = this.TypeId;
+
+            // disconnect
+            Thingy.DB.Disconnect();
+
+            // event
+            var handler = this.OnRefreshed;
+            handler?.Invoke(this, EventArgs.Empty);
+
+            // default
+            return true;
+        }
+
+        public bool Save()
+        {
+            // validate
+            if (!this.Validate()) return false;
+
+            // save to master
+            this.Status("Saving...");
             var queue = new Queue<string>();
             if (this.IsNew)
             {
@@ -143,37 +180,116 @@ namespace thing
                 queue = this.GetUpdates();
             }
 
+            // save master
+            if (!Thingy.DB.Execute(queue)) return false;
 
-            // database.execute(queue)
-
-            // remove flags
-            this.IsNew = false;
-            this.IsChanged = false;
+            // save
+            if (!_Properties.Save()) return false;
 
             // default
-            return true;
+            return this.Saved();
         }
-
-        public bool ValidateData()
+        private bool Saved()
         {
-            // ensure type id was set
-            if (this.TypeId != Guid.Empty) return this.ValidationFail("Type ID is not set.");
+            // new?
+            if (this.IsNew) this.IsNew = false;
+
+            // originals
+            _OriginalStatus = this.StatusId;
+            _OriginalType = this.TypeId;
+
+            // event
+            this.Status("Saved");
+            var handler = this.OnSaved;
+            handler?.Invoke(this, EventArgs.Empty);
 
             // default
+            this.Status();
             return true;
         }
 
+        protected void Status() { this.Status("Ready"); }
+        protected void Status(string status)
+        {
+            // event
+            var args = new StatusEventArgs(status);
+            var handler = this.OnStatus;
+            handler?.Invoke(this, args);
+        }
+
+        public bool Validate()
+        {
+            // status
+            this.Status("Validating...");
+
+            // properties
+            if (!_Properties.Validate()) return false;
+
+            // default
+            this.Status();
+            return true;
+        }
+
+        public event EventHandler OnChanged;
         public event EventHandler<ErrorEventArgs> OnError;
-        public event EventHandler<PropertyChangeArgs> OnChanged;
+        public event EventHandler OnRefreshed;
+        public event EventHandler OnSaved;
         public event EventHandler<StatusEventArgs> OnStatus;
-        public event EventHandler<ErrorEventArgs> OnValidationFail;
+
+        public static Guid GetStatusId(Guid thing_id)
+        {
+            var status_id = Guid.Empty;
+            var sql = new StringBuilder();
+            sql.Append("SELECT [StatusId] FROM [thing].[Master] WHERE [Id] = '");
+            sql.Append(thing_id);
+            sql.Append("'");
+            if (!Thingy.DB.Scalar(sql.ToString(), out status_id)) status_id = Guid.Empty;
+            return status_id;
+        }
+        public static Guid GetTypeId(Guid thing_id)
+        {
+            var type_id = Guid.Empty;
+            var sql = new StringBuilder();
+            sql.Append("SELECT [TypeId] FROM [thing].[Master] WHERE [Id] = '");
+            sql.Append(thing_id);
+            sql.Append("'");
+            if (!Thingy.DB.Scalar(sql.ToString(), out type_id)) type_id = Guid.Empty;
+            return type_id;
+        }
+        public static Guid GetKnownId(string type_code, string thing_code)
+        {
+            var sql = new StringBuilder();
+            var id = Guid.Empty;
+            sql.Append("SELECT [Id] FROM [thing].[Known] WHERE [TypeCode] = '");
+            sql.Append(type_code);
+            sql.Append("' AND [ThingCode] = '");
+            sql.Append(thing_code);
+            sql.Append("'");
+            if(!Thingy.DB.Scalar(sql.ToString(), out id)) id = Guid.Empty;
+            return id;
+        }
 
     }
 
-    public interface IThing : IData, IStatusHandling
+    public interface IThing : IDisposable
     {
         Guid Id { get; }
+        bool IsNew { get; }
         Guid TypeId { get; }
+        Guid StatusId { get; set; }
+        string Name { get; set; }
+        string Code { get; set; }
+        string Description { get; set; }
+
+        IPropertyValueList Properties { get; }
+
+        bool Refresh();
+
+        event EventHandler OnChanged;
+        event EventHandler<ErrorEventArgs> OnError;
+        event EventHandler OnRefreshed;
+        event EventHandler OnSaved;
+        event EventHandler<StatusEventArgs> OnStatus;
     }
 
 }

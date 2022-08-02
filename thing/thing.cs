@@ -11,24 +11,25 @@ namespace thing
     public class Thing : IThing
     {
 
-        internal Thing(Guid id, bool id_is_type)
+        internal Thing(Guid id)
         {
-            if (id_is_type)
-            {
-                this.Id = Guid.NewGuid();
-                this.TypeId = id;
-                this.IsNew = true;
-                this.StatusId = StatusThing.ID_ACTIVE;
-                _Properties = new PropertyValueList(this.Id);
-            }
-            else
-            {
-                this.Id = id;
-                this.IsNew = false;
-                _Properties = new PropertyValueList(this.Id);
-                this.Refresh();
-            }
-
+            this.Status("Loading thing [" + id.ToString().ToUpper() + "]");
+            this.Id = id;
+            this.IsNew = false;
+            _Properties = new PropertyValueList(this.Id);
+            this.Refresh();
+        }
+            
+        internal Thing(Guid type_id, Guid repo_id)
+        {
+            this.Id = Guid.NewGuid();
+            this.Status("Creating new thing. ID = [" + this.Id.ToString().ToUpper() + "]");
+            this.TypeId = type_id;
+            this.RepositoryId = repo_id;
+            this.IsNew = true;
+            this.StatusId = StatusThing.ID_ACTIVE;
+            _Properties = new PropertyValueList(this.Id);
+            
             // subscribe
             _Properties.OnChanged += this.OnChanged;
         }
@@ -39,7 +40,9 @@ namespace thing
         public Guid TypeId { get; private set; } = Guid.Empty;
         private Guid _OriginalType = Guid.Empty;
         public bool IsNew { get; private set; } = false;
-        
+        public Guid RepositoryId { get; private set; } = Guid.Empty;
+        private Guid _OriginalRepository = Guid.Empty;
+
         public string Name
         {
             get { return _Properties.GetString(PropertyThing.ID_NAME); }
@@ -58,6 +61,17 @@ namespace thing
 
         public IPropertyValueList Properties { get { return _Properties; } }
         private PropertyValueList _Properties;
+
+        public void MoveRepository(Guid new_repo)
+        {
+            // check repo
+            if (this.RepositoryId == new_repo) return;
+            if (!Thingy.Things.Repositories.Exists(x => x.Id == new_repo)) return;
+
+            // change repo
+            this.RepositoryId = new_repo;
+            if (!this.Save()) return;
+        }
 
         public void Dispose()
         {
@@ -84,12 +98,14 @@ namespace thing
         {
             var queue = new Queue<string>();
             var sql = new StringBuilder();
-            sql.Append("INSERT [thing].[Master] ( [Id], [TypeId], [StatusId] ) SELECT '");
+            sql.Append("INSERT [thing].[Master] ( [Id], [TypeId], [StatusId], [RepositoryId] ) SELECT '");
             sql.Append(this.Id);
             sql.Append("', '");
             sql.Append(this.TypeId);
             sql.Append("', '");
             sql.Append(this.StatusId);
+            sql.Append("', '");
+            sql.Append(this.RepositoryId);
             sql.Append("'");
             queue.Enqueue(sql.ToString());
             return queue;
@@ -97,13 +113,15 @@ namespace thing
         protected virtual Queue<string> GetUpdates()
         {
             var queue = new Queue<string>();
-            if(this.StatusId != _OriginalStatus || this.TypeId != _OriginalType)
+            if (this.StatusId != _OriginalStatus || this.TypeId != _OriginalType || this.RepositoryId != _OriginalRepository)
             {
                 var sql = new StringBuilder();
                 sql.Append("UPDATE [thing].[Master] SET [TypeId] = '");
                 sql.Append(this.TypeId);
                 sql.Append("', [StatusId] = '");
                 sql.Append(this.StatusId);
+                sql.Append("', [RepositoryId] = '");
+                sql.Append(this.RepositoryId);
                 sql.Append("' ");
                 sql.Append(this.GetWhereClause());
                 queue.Enqueue(sql.ToString());
@@ -129,7 +147,7 @@ namespace thing
 
             // data from thing.master
             var sql = new StringBuilder();
-            sql.Append("SELECT [TypeId], [StatusId] FROM [thing].[Master] ");
+            sql.Append("SELECT [TypeId], [StatusId], [RepositoryId] FROM [thing].[Master] ");
             sql.Append(this.GetWhereClause());
 
             // start reader
@@ -140,6 +158,7 @@ namespace thing
             {
                 this.TypeId = Thingy.DB.Reader.GetGuid(0);
                 this.StatusId = Thingy.DB.Reader.GetGuid(1);
+                this.RepositoryId = Thingy.DB.Reader.GetGuid(2);
             }
             else
             {
@@ -151,6 +170,7 @@ namespace thing
             // set original values
             _OriginalStatus = this.StatusId;
             _OriginalType = this.TypeId;
+            _OriginalRepository = this.RepositoryId;
 
             // disconnect
             Thingy.DB.Disconnect();
@@ -197,6 +217,7 @@ namespace thing
             // originals
             _OriginalStatus = this.StatusId;
             _OriginalType = this.TypeId;
+            _OriginalRepository = this.RepositoryId;
 
             // event
             this.Status("Saved");
@@ -230,12 +251,24 @@ namespace thing
             return true;
         }
 
+        public static Guid ID_NULL { get { return Guid.Empty; } }
+
         public event EventHandler OnChanged;
         public event EventHandler<ErrorEventArgs> OnError;
         public event EventHandler OnRefreshed;
         public event EventHandler OnSaved;
         public event EventHandler<StatusEventArgs> OnStatus;
 
+        public static Guid GetRepositoryId(Guid thing_id)
+        {
+            var repo_id = Guid.Empty;
+            var sql = new StringBuilder();
+            sql.Append("SELECT [RepositoryId] FROM [thing].[Master] WHERE [Id] = '");
+            sql.Append(thing_id);
+            sql.Append("'");
+            if (!Thingy.DB.Scalar(sql.ToString(), out repo_id)) repo_id = Guid.Empty;
+            return repo_id;
+        }
         public static Guid GetStatusId(Guid thing_id)
         {
             var status_id = Guid.Empty;
@@ -282,6 +315,8 @@ namespace thing
         string Description { get; set; }
 
         IPropertyValueList Properties { get; }
+
+        void MoveRepository(Guid new_repo);
 
         bool Refresh();
 

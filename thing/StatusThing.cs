@@ -9,8 +9,8 @@ namespace thing
     public class StatusThing : Thing
     {
 
-        protected StatusThing() : base(TypeThing.ID_STATUS, true) { }
-        protected StatusThing(Guid id) : base(id, false) { }
+        internal StatusThing() : base(TypeThing.ID_STATUS, RepositoryThing.ID_NEW) { }
+        internal StatusThing(Guid id) : base(id) { }
 
         public static Guid ID_ACTIVE
         {

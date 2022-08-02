@@ -12,13 +12,41 @@ namespace thing_console
         static void Main(string[] args)
         {
             // setup
-            thing.DB.DatabaseName = "Thing_db";
-            thing.DB.ServerName = "EV701307DELL\\LMR";
-            thing.DB.TestConnection();
+            Thingy.OnError += OnError;
+            Thingy.OnStatus += OnStatus;
+            Thingy.Database.DatabaseName = "Thing_db";
+            Thingy.Database.ServerName = "EV701307DELL\\LMR";
+            Thingy.Database.TestConnection();
 
+            // test
+            Thingy.Refresh();
+            foreach(var item in Thingy.Things.Types)
+            {
+                Console.WriteLine(item.Name);
+            }
+            //var id = TypeThing.ID_TYPE;
+            //var t = new TypeThing(id);
+            //Console.WriteLine(t.Id);
+            //Console.WriteLine(t.Name);
+            //t.Description = "";
+            //t.Save();
+            //t.Dispose();
+            
             // finished
             Console.WriteLine("press any key to exit");
             Console.ReadKey();
+        }
+
+        private static void OnStatus(object sender, StatusEventArgs args)
+        {
+            Console.WriteLine(args.Message);
+        }
+        private static void OnError(object sender, ErrorEventArgs args)
+        {
+            var clr = Console.ForegroundColor;
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine(args.Message);
+            Console.ForegroundColor = clr;
         }
     }
 }

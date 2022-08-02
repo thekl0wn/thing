@@ -103,4 +103,20 @@ namespace thing
         public string Sql { get; }
     }
 
+    public class LoggableEventArgs : EventArgs
+    {
+        public LoggableEventArgs(string log_data, int log_level)
+        {
+            this.LogData = log_data;
+            this.LogLevel = log_level;
+        }
+        public LoggableEventArgs(string log_data)
+        {
+            this.LogData = log_data;
+        }
+
+        public string LogData { get; }
+        public int LogLevel { get; } = 0;
+    }
+
 }

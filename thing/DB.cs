@@ -40,7 +40,14 @@ namespace thing
             if (_Connection == null) _Connection = new SqlConnection(this.ConnectionString);
 
             // connect
-            _Connection.Open();
+            try
+            {
+                _Connection.Open();
+            }
+            catch(Exception e)
+            {
+                return this.Error(e);
+            }
 
             // return based on connection state
             if(_Connection.State == System.Data.ConnectionState.Open)
@@ -108,6 +115,7 @@ namespace thing
 
         internal bool Error(Exception e)
         {
+            this.Disconnect();
             var args = new ErrorEventArgs(e);
             var handler = this.OnError;
             handler?.Invoke(this, args);
@@ -115,6 +123,8 @@ namespace thing
         }
         internal bool Error(string error)
         {
+            this.Disconnect();
+
             // event
             var args = new ErrorEventArgs(error);
             var handler = this.OnError;
@@ -129,8 +139,15 @@ namespace thing
             // create the command
             if (!this.CreateCommand(sql)) return false;
 
-            // execute as non-query
-            _Command.ExecuteNonQuery();
+            try
+            {
+                // execute as non-query
+                _Command.ExecuteNonQuery();
+            }
+            catch(Exception e)
+            {
+                return this.Error(e);
+            }
 
             // disconnect
             this.Disconnect();
@@ -161,7 +178,14 @@ namespace thing
             if (!this.CreateCommand(sql)) return false;
 
             // execute as scalar
-            value = _Command.ExecuteScalar();
+            try
+            {
+                value = _Command.ExecuteScalar();
+            }
+            catch(Exception e)
+            {
+                return this.Error(e);
+            }
 
             // disconnect
             this.Disconnect();
@@ -202,8 +226,15 @@ namespace thing
             }
 
             // execute as reader
-            this.Reader = new DbReader(_Command.ExecuteReader());
-            this.Reader.OnReaderRead += this.OnReaderRead;
+            try
+            {
+                this.Reader = new DbReader(_Command.ExecuteReader());
+                this.Reader.OnReaderRead += this.OnReaderRead;
+            }
+            catch(Exception e)
+            {
+                return this.Error(e);
+            }
 
             // calling object's responsibility to disconnect
 
@@ -238,7 +269,7 @@ namespace thing
                 // event
                 var handler = this.OnTestSuccess;
                 handler?.Invoke(this, EventArgs.Empty);
-
+                
                 // return
                 return true;
             }

@@ -226,15 +226,18 @@ namespace thing
             get
             {
                 // see if any values have been changed
-                foreach(var item in this)
+                foreach (var item in this)
                 {
-                    if (item.IsChanged) return true;
+                    if (item.IsChanged)
+                    {
+                        _IsChanged = true;
+                        return true;
+                    }
                 }
-
-                // no changes found
-                return false;
+                return _IsChanged;
             }
         }
+        private bool _IsChanged = false;
 
         public void Add(Guid property_id) { this.Add(property_id, ""); }
         public void Add(Guid property_id, string value) { this.Add(property_id, value, false); }
@@ -344,6 +347,21 @@ namespace thing
             return true;
         }
 
+        public void Remove(Guid property_id)
+        {
+            if (this.Exists(property_id))
+            {
+                // remove
+                var idx = this.FindIndex(x => x.PropertyId == property_id);
+                this.RemoveAt(idx);
+
+                // changed
+                _IsChanged = true;
+                var handler = this.OnChanged;
+                handler.Invoke(this, EventArgs.Empty);
+            }
+        }
+
         public bool Save()
         {
             // validate
@@ -434,6 +452,8 @@ namespace thing
         decimal GetDecimal(Guid property_id);
         DateTime GetDateTime(Guid property_id);
         Guid GetGuid(Guid property_id);
+
+        void Remove(Guid property_id);
 
         void SetValue(Guid property_id, string value);
         void SetValue(Guid property_id, int value);

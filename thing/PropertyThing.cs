@@ -9,8 +9,8 @@ namespace thing
     public class PropertyThing : Thing
     {
 
-        protected PropertyThing() : base(TypeThing.ID_PROPERTY, true) { }
-        protected PropertyThing(Guid id) : base(id, false) { }
+        internal PropertyThing() : base(TypeThing.ID_PROPERTY, RepositoryThing.ID_NEW) { }
+        internal PropertyThing(Guid id) : base(id) { }
 
         public static Guid ID_CODE
         {

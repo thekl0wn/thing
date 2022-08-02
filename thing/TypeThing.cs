@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace thing
 {
-    public class TypeThing : Thing
+    internal class TypeThing : Thing, ITypeThing
     {
 
-        protected TypeThing() : base(TypeThing.ID_TYPE, true) { }
-        protected TypeThing(Guid id) : base(id, false) { }
+        internal TypeThing() : base(TypeThing.ID_TYPE, RepositoryThing.ID_NEW) { }
+        internal TypeThing(Guid id) : base(id) { }
 
 
         public static Guid ID_PROPERTY
@@ -22,6 +22,16 @@ namespace thing
             }
         }
         private static Guid _ID_PROPERTY = Guid.Empty;
+
+        public static Guid ID_REPOSITORY
+        {
+            get
+            {
+                if (_ID_REPOSITORY == Guid.Empty) _ID_REPOSITORY = TypeThing.GetId("REPOSITORY");
+                return _ID_REPOSITORY;
+            }
+        }
+        private static Guid _ID_REPOSITORY = Guid.Empty;
 
         public static Guid ID_STATUS
         {
@@ -47,6 +57,11 @@ namespace thing
         {
             return Thing.GetKnownId("TYPE", code);
         }
+
+    }
+
+    public interface ITypeThing : IThing
+    {
 
     }
 }

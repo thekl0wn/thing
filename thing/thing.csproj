@@ -56,9 +56,9 @@
     </Compile>
     <Compile Include="PropertyThing.cs" />
     <Compile Include="PropertyValue.cs" />
+    <Compile Include="RepositoryThing.cs" />
     <Compile Include="StatusThing.cs" />
     <Compile Include="thing.cs" />
-    <Compile Include="ThingController.cs" />
     <Compile Include="Thingy.cs" />
     <Compile Include="TypeThing.cs" />
   </ItemGroup>
